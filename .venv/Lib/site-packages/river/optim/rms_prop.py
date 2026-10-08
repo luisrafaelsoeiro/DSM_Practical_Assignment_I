@@ -1,0 +1,84 @@
+from __future__ import annotations
+
+import collections
+import typing
+
+import numpy as np
+
+from river import optim, utils
+from river.optim.base import DictLike, VectorLike
+
+__all__ = ["RMSProp"]
+
+
+class RMSProp(optim.base.Optimizer):
+    """RMSProp optimizer.
+
+    Parameters
+    ----------
+    lr
+    rho
+    eps
+
+    Examples
+    --------
+
+    >>> from river import datasets
+    >>> from river import evaluate
+    >>> from river import linear_model
+    >>> from river import metrics
+    >>> from river import optim
+    >>> from river import preprocessing
+
+    >>> dataset = datasets.Phishing()
+    >>> optimizer = optim.RMSProp()
+    >>> model = (
+    ...     preprocessing.StandardScaler() |
+    ...     linear_model.LogisticRegression(optimizer)
+    ... )
+    >>> metric = metrics.F1()
+
+    >>> evaluate.progressive_val_score(dataset, model, metric)
+    F1: 87.24%
+
+    References
+    ----------
+    [^1]: [Divide the gradient by a running average of itsrecent magnitude](https://www.cs.toronto.edu/~tijmen/csc321/slides/lecture_slides_lec6.pdf)
+
+    """
+
+    def __init__(
+        self, lr: int | float | optim.base.Scheduler = 0.1, rho: float = 0.9, eps: float = 1e-8
+    ):
+        super().__init__(lr)
+        self.rho = rho
+        self.eps = eps
+        # Dual-mode accumulator: a `defaultdict` of floats on the `learn_one` path, or an
+        # array-like (`np.ndarray`/`VectorDict`) on the `learn_many` path. These modes support
+        # disjoint operations, so no single static type fits both — hence `Any`.
+        self.g2: typing.Any = None
+
+    def _step_with_dict(self, w: DictLike, g: DictLike) -> DictLike:
+        if self.g2 is None:
+            self.g2 = collections.defaultdict(float)
+
+        for i, gi in g.items():
+            self.g2[i] = self.rho * self.g2[i] + (1 - self.rho) * gi**2
+            w[i] -= self.learning_rate / (self.g2[i] + self.eps) ** 0.5 * gi
+
+        return w
+
+    def _step_with_vector(self, w: VectorLike, g: VectorLike) -> VectorLike:
+        if self.g2 is None:
+            if isinstance(w, np.ndarray):
+                self.g2 = np.zeros_like(w)
+            else:
+                self.g2 = utils.VectorDict()
+
+        if isinstance(g, utils.VectorDict):
+            self.g2.update_ema(g, self.rho, square=True)
+        else:
+            self.g2 = self.rho * self.g2 + (1 - self.rho) * g**2
+        w -= self.learning_rate / (self.g2 + self.eps) ** 0.5 * g
+
+        return w
