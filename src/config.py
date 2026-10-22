@@ -2,11 +2,11 @@
 from pathlib import Path
 
 # Project configuration
-START_DATE = "2021-01-01"
+START_DATE = "2013-01-01"
 END_DATE = "2023-12-31"
 TIMEZONE = "Europe/Lisbon"
 
-WARMUP_END = "2021-12-31"
+WARMUP_END = "2020-09-13"
 WARMUP_PERCENTAGE = 0.33  # Currently unused
 
 HOT_PERCENTILE = 0.80

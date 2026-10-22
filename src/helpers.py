@@ -22,15 +22,27 @@ from config import (
 )
 
 
+
 def fetch_open_meteo_data(
     latitude: float,
     longitude: float,
     start_date: str,
     end_date: str,
     city_name: str,
+    force_download: bool = False,
 ) -> pd.DataFrame:
-    """Fetch hourly weather observations and save raw and processed data."""
+    """Load cached weather data or download and save it if unavailable."""
 
+    raw_path = RAW_DIR / f"{city_name.lower()}.json"
+    processed_path = PROCESSED_DIR / f"{city_name.lower()}.csv"
+
+    # Reuse existing processed data to avoid unnecessary downloads
+    if processed_path.exists() and not force_download:
+        print(f"{city_name}: loading cached data from {processed_path}")
+        df = pd.read_csv(processed_path, parse_dates=["time"])
+        return df
+
+    # Download data only if the cache is missing or a refresh is requested
     url = "https://archive-api.open-meteo.com/v1/archive"
 
     params = {
@@ -57,8 +69,6 @@ def fetch_open_meteo_data(
         )
 
     # Save the raw API response
-    raw_path = RAW_DIR / f"{city_name.lower()}.json"
-
     with raw_path.open("w", encoding="utf-8") as file:
         json.dump(data, file, ensure_ascii=False, indent=2)
 
@@ -79,12 +89,11 @@ def fetch_open_meteo_data(
     df = df.sort_values("time").reset_index(drop=True)
 
     # Save processed data
-    processed_path = PROCESSED_DIR / f"{city_name.lower()}.csv"
     df.to_csv(processed_path, index=False)
 
     print(
-        f"{city_name}: {len(df):,} observations saved "
-        f"to {processed_path}"
+        f"{city_name}: downloaded {len(df):,} observations "
+        f"and saved to {processed_path}"
     )
 
     return df
