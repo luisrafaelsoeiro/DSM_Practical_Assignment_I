@@ -21,8 +21,6 @@ from config import (
     MIN_CONSECUTIVE_HOT_DAYS
 )
 
-
-
 def fetch_open_meteo_data(
     latitude: float,
     longitude: float,
@@ -35,6 +33,9 @@ def fetch_open_meteo_data(
 
     raw_path = RAW_DIR / f"{city_name.lower()}.json"
     processed_path = PROCESSED_DIR / f"{city_name.lower()}.csv"
+
+    RAW_DIR.mkdir(parents=True, exist_ok=True)
+    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 
     # Reuse existing processed data to avoid unnecessary downloads
     if processed_path.exists() and not force_download:
