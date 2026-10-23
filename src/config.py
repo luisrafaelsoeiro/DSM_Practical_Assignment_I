@@ -1,13 +1,15 @@
 
 from pathlib import Path
+import pandas as pd
 
 # Project configuration
 START_DATE = "2013-01-01"
 END_DATE = "2023-12-31"
 TIMEZONE = "Europe/Lisbon"
 
-WARMUP_END = "2020-09-13"
-WARMUP_PERCENTAGE = 0.33  # Currently unused
+WARMUP_START = pd.Timestamp("2013-01-01")
+WARMUP_END = pd.Timestamp("2015-12-31")
+WARMUP_PERCENTAGE = 0.10
 
 HOT_PERCENTILE = 0.80
 MIN_CONSECUTIVE_HOT_DAYS = 3

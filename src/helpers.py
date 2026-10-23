@@ -18,7 +18,9 @@ from config import (
     WEATHER_COLUMNS,
     HOT_PERCENTILE,
     WARMUP_PERCENTAGE,
-    MIN_CONSECUTIVE_HOT_DAYS
+    MIN_CONSECUTIVE_HOT_DAYS,
+    WARMUP_START,
+    WARMUP_END
 )
 
 def fetch_open_meteo_data(
@@ -385,49 +387,74 @@ def get_warmup_end(df: pd.DataFrame) -> pd.Timestamp:
 
 
 def estimate_threshold_incrementally(
-    city_data: dict[str, pd.DataFrame],
-    warmup_ends: dict[str, pd.Timestamp],
-) -> tuple[float, int]:
+    clean_data,
+    warmup_ends,
+    percentile=0.80,
+):
     """
-    Estimate a pooled hot-day threshold using an online quantile.
+    Estimate a frozen temperature threshold incrementally using
+    hourly temperature observations from each city's warm-up period.
 
-    Each valid daily maximum from each city's warm-up period
-    updates the same quantile estimator.
+    Parameters
+    ----------
+    clean_data : dict
+        Dictionary mapping city names to DataFrames.
+        Each DataFrame must contain 'time' and 'temperature'.
+    warmup_ends : dict
+        Dictionary mapping each city to its warm-up end date.
+        The end date is inclusive.
+    percentile : float
+        Quantile to estimate. Defaults to 0.80 (80th percentile).
 
-    Returns:
-        threshold: Estimated HOT_PERCENTILE quantile in °C.
-        observations_seen: Number of daily maxima processed.
+    Returns
+    -------
+    threshold : float
+        Estimated quantile from all valid hourly warm-up temperatures.
+    n_observations : int
+        Number of hourly observations processed.
     """
+    import numpy as np
+    import pandas as pd
+    from river import stats
 
-    quantile = stats.Quantile(q=HOT_PERCENTILE)
-    observations_seen = 0
+    if not 0 < percentile < 1:
+        raise ValueError("percentile must be between 0 and 1.")
 
-    for city, df in city_data.items():
-        if city not in warmup_ends:
-            raise ValueError(f"Missing warm-up end date for {city}.")
+    quantile_model = stats.Quantile(q=percentile)
+    n_observations = 0
 
-        if df.empty:
-            continue
+    for city, df in clean_data.items():
+        data = df.copy()
 
-        timestamps = pd.to_datetime(df["time"])
-        warmup_end = warmup_ends[city]
-
-        # Only observations within this city's warm-up period.
-        warmup_df = df.loc[
-            timestamps.dt.normalize() <= warmup_end
-        ]
-
-        # Update the online quantile once per daily maximum.
-        for _, daily_max in iter_daily_maxima(warmup_df):
-            quantile.update(daily_max)
-            observations_seen += 1
-
-    if observations_seen == 0:
-        raise ValueError(
-            "The warm-up period contains no valid daily maxima."
+        data["time"] = pd.to_datetime(data["time"], errors="coerce")
+        data["temperature"] = pd.to_numeric(
+            data["temperature"],
+            errors="coerce",
         )
 
-    return float(quantile.get()), observations_seen
+        warmup_start = pd.Timestamp(WARMUP_START)
+        warmup_end = pd.Timestamp(warmup_ends[city])
+
+        # Include the entire final warm-up day.
+        warmup_end_exclusive = warmup_end.normalize() + pd.Timedelta(days=1)
+
+        mask = (
+            (data["time"] >= warmup_start)
+            & (data["time"] < warmup_end_exclusive)
+            & np.isfinite(data["temperature"])
+        )
+
+        # Feed one hourly temperature at a time to River.
+        for temperature in data.loc[mask, "temperature"]:
+            quantile_model.update(float(temperature))
+            n_observations += 1
+
+    if n_observations == 0:
+        raise ValueError(
+            "No valid hourly warm-up temperatures were found."
+        )
+
+    return float(quantile_model.get()), n_observations
 
 
 def estimate_threshold_daily_max(
