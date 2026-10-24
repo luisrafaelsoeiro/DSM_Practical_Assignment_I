@@ -1,105 +1,37 @@
 
 import json
+import math
 
 import numpy as np
 import pandas as pd
 import requests
+from scipy.stats import ks_2samp
 
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from plotly.colors import qualitative
 
 from river import stats
 
 from config import (
     PHYSICAL_BOUNDS,
-    PROCESSED_DIR,
-    RAW_DIR,
-    TIMEZONE,
     WEATHER_COLUMNS,
     HOT_PERCENTILE,
     WARMUP_PERCENTAGE,
     MIN_CONSECUTIVE_HOT_DAYS,
     WARMUP_START,
-    WARMUP_END
+    WEATHER_COLUMNS,
+    PHYSICAL_BOUNDS,
+    PRECIP_TICKS,
+    MONTH_TO_SEASON,
+    VAR_UNIT,
+    SEASONS,
+    SEASON_MONTHS,
+    C_EVT,
+    C_NON,
+    VAR_LABEL,
+    FEATURE_COLS_B
 )
-
-def fetch_open_meteo_data(
-    latitude: float,
-    longitude: float,
-    start_date: str,
-    end_date: str,
-    city_name: str,
-    force_download: bool = False,
-) -> pd.DataFrame:
-    """Load cached weather data or download and save it if unavailable."""
-
-    raw_path = RAW_DIR / f"{city_name.lower()}.json"
-    processed_path = PROCESSED_DIR / f"{city_name.lower()}.csv"
-
-    RAW_DIR.mkdir(parents=True, exist_ok=True)
-    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
-
-    # Reuse existing processed data to avoid unnecessary downloads
-    if processed_path.exists() and not force_download:
-        print(f"{city_name}: loading cached data from {processed_path}")
-        df = pd.read_csv(processed_path, parse_dates=["time"])
-        return df
-
-    # Download data only if the cache is missing or a refresh is requested
-    url = "https://archive-api.open-meteo.com/v1/archive"
-
-    params = {
-        "latitude": latitude,
-        "longitude": longitude,
-        "start_date": start_date,
-        "end_date": end_date,
-        "hourly": [
-            "temperature_2m",
-            "relative_humidity_2m",
-            "precipitation",
-            "wind_speed_10m",
-        ],
-        "timezone": TIMEZONE,
-    }
-
-    response = requests.get(url, params=params, timeout=60)
-    response.raise_for_status()
-    data = response.json()
-
-    if "hourly" not in data or "time" not in data["hourly"]:
-        raise ValueError(
-            f"Invalid hourly API response for {city_name}."
-        )
-
-    # Save the raw API response
-    with raw_path.open("w", encoding="utf-8") as file:
-        json.dump(data, file, ensure_ascii=False, indent=2)
-
-    # Create and standardize the DataFrame
-    df = pd.DataFrame(data["hourly"])
-
-    df = df.rename(
-        columns={
-            "temperature_2m": "temperature",
-            "relative_humidity_2m": "humidity",
-            "wind_speed_10m": "wind_speed",
-        }
-    )
-
-    df["time"] = pd.to_datetime(df["time"])
-    df["city"] = city_name
-
-    df = df.sort_values("time").reset_index(drop=True)
-
-    # Save processed data
-    df.to_csv(processed_path, index=False)
-
-    print(
-        f"{city_name}: downloaded {len(df):,} observations "
-        f"and saved to {processed_path}"
-    )
-
-    return df
 
 
 def audit_weather_data(
@@ -204,10 +136,6 @@ def audit_weather_data(
     return result, audit
 
 
-# Dictionary for storing downloaded weather DataFrames
-weather_data = {}
-
-
 def get_model_ready_data(
     df: pd.DataFrame,
     city_name: str = "Unknown",
@@ -304,7 +232,6 @@ def get_model_ready_data(
             print(f"  {column}: {count} value(s) imputed")
 
     return result
-
 
 
 def iter_daily_maxima(df: pd.DataFrame):
@@ -720,7 +647,7 @@ def label_stream_online(
 
     return result
 
-def label_stream_hourly(
+def label_heat_stress_hour(
     df: pd.DataFrame,
     threshold: float,
     warmup_end: pd.Timestamp,
@@ -730,7 +657,7 @@ def label_stream_hourly(
     temperature reaches the fixed hot-temperature threshold.
 
     Observations from the warm-up period are excluded.
-    target = 1 if temperature >= threshold, otherwise 0.
+    target_hot = 1 if temperature >= threshold, otherwise 0.
     """
 
     # Keep only observations after the warm-up period.
@@ -744,7 +671,7 @@ def label_stream_hourly(
     # Assign the hourly heat-stress label.
     # Missing temperatures remain unlabelled rather than being
     # incorrectly classified as non-hot observations.
-    stream["target"] = np.where(
+    stream["target_hot"] = np.where(
         stream["temperature"].isna(),
         np.nan,
         (stream["temperature"] >= threshold).astype(int),
@@ -982,7 +909,7 @@ def plot_heatwave_detection(
     threshold: float = None,
     warmup_end=None,
     temperature_col: str = "temperature",
-    target_col: str = "target",
+    target_col: str = "target_hot",
     show: bool = True,
 ):
     """
@@ -1477,3 +1404,249 @@ def plot_calendar_heatmap(
         fig.show()
 
     return fig
+
+
+def _prepare(weather_df, labeled_df, variables, target_col, warmup_end):
+    w = weather_df.copy()
+    w["time"] = pd.to_datetime(w["time"])
+
+    if target_col not in w.columns:
+        lab = labeled_df[["time", target_col]].copy()
+        lab["time"] = pd.to_datetime(lab["time"])
+        w = w.merge(lab, on="time", how="inner")
+    if w.empty:
+        raise ValueError(
+            "No overlapping timestamps between the weather data and the labelled "
+            "data. Check that both 'time' columns share the same dtype/timezone."
+        )
+
+    w = w.dropna(subset=[target_col]).sort_values("time")
+    if warmup_end is not None:
+        ts = pd.Timestamp(warmup_end)
+        if w["time"].dt.tz is not None and ts.tzinfo is None:
+            ts = ts.tz_localize(w["time"].dt.tz)
+        w = w[w["time"] >= ts]
+
+    w["season"] = w["time"].dt.month.map(MONTH_TO_SEASON)
+    w["event"] = w[target_col].astype(int).eq(1)
+    return w[["time", "season", "event"] + list(variables)]
+
+
+def plot_event_comparison(
+    weather_df: pd.DataFrame,
+    labeled_df: pd.DataFrame,
+    city: str,
+    variables=("humidity", "precipitation", "wind_speed"),
+    target_col: str = "target_hot",
+    warmup_end=None,
+    units: dict = None,
+    show: bool = True,
+):
+    """
+    Split violin plots (non-event on the left, heat-stress event on the right)
+    for every variable (rows) and season (columns).
+
+      - heat-stress event = hours with the heat-wave alert active (target == 1)
+      - diamond = median of each group
+      - under each panel: sample sizes and the shift in the median
+      - precipitation: wet hours only (> 0 mm), drawn on a log scale, with the
+        share of wet hours reported instead of the (mostly zero) full distribution
+    If `warmup_end` is given, the warm-up period is excluded, so the
+    non-event group is not contaminated by hours the detector never evaluated.
+    """
+    variables = list(variables)
+    d = _prepare(weather_df, labeled_df, variables, target_col, warmup_end)
+    unit = {**VAR_UNIT, **(units or {})}
+
+    n_rows, n_cols = len(variables), len(SEASONS)
+    titles = [f"<b>{s}</b><br><sup>{SEASON_MONTHS[s]}</sup>" for s in SEASONS]
+    titles += [""] * (n_rows * n_cols - n_cols)
+
+    fig = make_subplots(
+        rows=n_rows, cols=n_cols,
+        subplot_titles=titles,
+        horizontal_spacing=0.03, vertical_spacing=0.11,
+    )
+
+    # Common y-range per row so seasons are directly comparable
+    ranges, transform = {}, {}
+    for var in variables:
+        v = d[var].dropna()
+        if var == "precipitation":
+            wet = v[v > 0]
+            lo, hi = np.log10(wet.min()), np.log10(wet.quantile(0.999))
+            ranges[var] = [lo - 0.15, hi + 0.15]
+            transform[var] = np.log10
+        elif var == "humidity":
+            ranges[var] = [0, 100]
+            transform[var] = None
+        else:
+            ranges[var] = [0, v.quantile(0.995) * 1.05]
+            transform[var] = None
+
+    for r, var in enumerate(variables, start=1):
+        is_precip = var == "precipitation"
+        for c, season in enumerate(SEASONS, start=1):
+            sub = d[d["season"] == season]
+            groups = {"Non-event": sub[~sub["event"]][var].dropna(),
+                      "Heat-stress event": sub[sub["event"]][var].dropna()}
+            stats = {}
+
+            for g, (name, vals) in enumerate(groups.items()):
+                n_total = len(vals)
+                if is_precip:
+                    wet = vals[vals > 0]
+                    stats[name] = dict(n=n_total, wet_share=100 * len(wet) / max(n_total, 1),
+                                       n_plot=len(wet), median=wet.median() if len(wet) else np.nan)
+                    vals = np.log10(wet)
+                else:
+                    stats[name] = dict(n=n_total, n_plot=n_total,
+                                       median=vals.median() if n_total else np.nan)
+                if len(vals) < 2:
+                    continue          # nothing to draw (e.g. no heat-stress hours in winter)
+
+                color = C_EVT if g == 1 else C_NON
+                first_panel = (r == 1 and c == 1)
+                fig.add_trace(
+                    go.Violin(
+                        y=vals.values, x0=0,
+                        side="positive" if g == 1 else "negative",
+                        width=1.0, spanmode="hard",
+                        scalemode="width",
+                        points=False, box_visible=False, meanline_visible=False,
+                        fillcolor=color, opacity=0.65,
+                        line=dict(color=color, width=1.2),
+                        bandwidth=0.12 if is_precip else None,
+                        name=name, legendgroup=name,
+                        showlegend=first_panel,
+                        hoverinfo="skip" if is_precip else "y",
+                    ),
+                    row=r, col=c,
+                )
+                # median marker (real units on hover)
+                med = vals.median()
+                real_med = 10 ** med if is_precip else med
+                fig.add_trace(
+                    go.Scatter(
+                        x=[0.06 if g == 1 else -0.06], y=[med],
+                        mode="markers",
+                        marker=dict(symbol="diamond", size=8,
+                                    color="white", line=dict(color=color, width=2)),
+                        hovertemplate=f"{name}<br>median {real_med:.1f} {unit[var]}<extra></extra>",
+                        showlegend=False,
+                    ),
+                    row=r, col=c,
+                )
+
+            # ----- text under the panel ---------------------------------
+            ne, ev = stats["Non-event"], stats["Heat-stress event"]
+            if ev["n"] == 0:
+                text = f"n = {ne['n']:,} | 0<br><i>no heat-stress hours</i>"
+            else:
+                if is_precip:
+                    shift = ev["median"] - ne["median"]
+                    line2 = (f"wet: {ne['wet_share']:.0f}% | {ev['wet_share']:.0f}%"
+                             f"  ·  Δmedian {shift:+.2f}" if pd.notna(shift) else
+                             f"wet: {ne['wet_share']:.0f}% | {ev['wet_share']:.0f}%")
+                else:
+                    shift = ev["median"] - ne["median"]
+                    line2 = f"Δmedian {shift:+.1f} {unit[var]}"
+                text = f"n = {ne['n']:,} | {ev['n']:,}<br>{line2}"
+
+            sp = fig.get_subplot(r, c)
+            xref = sp.xaxis.plotly_name.replace("xaxis", "x")
+            yref = sp.yaxis.plotly_name.replace("yaxis", "y")
+            fig.add_annotation(
+                x=0.5, y=0, xref=f"{xref} domain", yref=f"{yref} domain",
+                text=text, showarrow=False, yanchor="top", yshift=-6,
+                font=dict(size=10, color="#555"),
+            )
+
+            # ----- axes --------------------------------------------------
+            fig.update_xaxes(range=[-0.6, 0.6], showticklabels=False,
+                             showgrid=False, zeroline=False, row=r, col=c)
+            yk = dict(range=ranges[var], showgrid=True,
+                      gridcolor="rgba(0,0,0,0.07)", zeroline=False,
+                      showticklabels=(c == 1))
+            if is_precip:
+                ticks = [t for t in PRECIP_TICKS
+                         if ranges[var][0] <= np.log10(t) <= ranges[var][1]]
+                yk.update(tickmode="array",
+                          tickvals=[np.log10(t) for t in ticks],
+                          ticktext=[f"{t:g}" for t in ticks])
+            fig.update_yaxes(row=r, col=c, **yk)
+
+        label = VAR_LABEL.get(var, var.replace("_", " ").capitalize())
+        ytitle = f"{label} ({unit[var]})"
+        if is_precip:
+            ytitle += "<br><sup>wet hours · log scale</sup>"
+        fig.update_yaxes(title_text=ytitle, row=r, col=1)
+
+    n_evt = int(d["event"].sum())
+    fig.update_layout(
+        template="plotly_white",
+        width=1250,
+        height=290 * n_rows + 150,
+        violinmode="overlay",
+        title=dict(
+            text=(
+                f"<b>Heat-Stress vs. Non-Event Conditions — {city}</b>"
+                f"<br><sup>{len(d):,} hours analysed · {n_evt:,} heat-stress hours "
+                f"({100 * n_evt / len(d):.1f}%) · diamond = median · "
+                f"annotation: n non-event | event</sup>"
+            ),
+            x=0.02,
+        ),
+        legend=dict(orientation="h", x=1, xanchor="right", y=1.0,
+                    yanchor="bottom", itemsizing="constant"),
+        margin=dict(l=100, r=30, t=130, b=40),
+        font=dict(family="Inter, Arial, sans-serif", size=12),
+    )
+
+    if show:
+        fig.show()
+    return fig
+
+
+def prepare_stream_features(df: pd.DataFrame, TAU_T_HOT: int) -> pd.DataFrame:
+    """Build features from historical observations only."""
+
+    result = df.sort_values("time").copy().reset_index(drop=True)
+
+    # Historical measurements available before the current observation.
+    for column in WEATHER_COLUMNS:
+        result[f"{column}_lag1"] = result[column].shift(1)
+
+    previous_temperature = result["temperature"].shift(1)
+
+    result["delta_temp"] = (
+        result["temperature"].shift(1)
+        - result["temperature"].shift(2)
+    )
+
+    result["rolling_mean_temp_6h"] = (
+        previous_temperature.rolling(6, min_periods=6).mean()
+    )
+
+    result["rolling_std_temp_6h"] = (
+        previous_temperature.rolling(6, min_periods=6).std()
+    )
+
+    result["rolling_mean_temp_24h"] = (
+        previous_temperature.rolling(24, min_periods=24).mean()
+    )
+
+    previous_hot = (
+        result["temperature"].shift(1) >= TAU_T_HOT
+    ).astype(float)
+
+    result["heat_events_last_24h"] = (
+        previous_hot.rolling(24, min_periods=24).sum()
+    )
+
+    # Remove observations without enough historical context.
+    required = FEATURE_COLS_B + ["target_hot"]
+
+    result = result.dropna(subset=required).reset_index(drop=True)
+
+    return result

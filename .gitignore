@@ -1,2 +1,9 @@
 # Virtual environments
 .venv/
+src/__pycache__/
+
+# Python cache
+__pycache__/
+
+figures/
+.ipynb_checkpoints/

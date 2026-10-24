@@ -6,3 +6,4 @@ scikit-learn==1.7.2
 scipy==1.15.3
 river
 plotly==5.24.1
+seaborn==0.12.3
