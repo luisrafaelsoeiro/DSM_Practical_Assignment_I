@@ -1,0 +1,48 @@
+{
+  "tau_t_hot": 20.2111833513539,
+  "warmup_start": "2013-01-01",
+  "warmup_end": "2015-12-31",
+  "hot_percentile": 0.8,
+  "stream_columns": {
+    "Aveiro": [
+      "time",
+      "temperature",
+      "relative_humidity",
+      "precipitation",
+      "wind_speed",
+      "night_min_temperature",
+      "city",
+      "target_hot",
+      "temperature_lag1",
+      "relative_humidity_lag1",
+      "precipitation_lag1",
+      "wind_speed_lag1",
+      "night_min_temperature_lag1",
+      "delta_temp",
+      "rolling_mean_temp_6h",
+      "rolling_std_temp_6h",
+      "rolling_mean_temp_24h",
+      "heat_events_last_24h"
+    ],
+    "Viseu": [
+      "time",
+      "temperature",
+      "relative_humidity",
+      "precipitation",
+      "wind_speed",
+      "night_min_temperature",
+      "city",
+      "target_hot",
+      "temperature_lag1",
+      "relative_humidity_lag1",
+      "precipitation_lag1",
+      "wind_speed_lag1",
+      "night_min_temperature_lag1",
+      "delta_temp",
+      "rolling_mean_temp_6h",
+      "rolling_std_temp_6h",
+      "rolling_mean_temp_24h",
+      "heat_events_last_24h"
+    ]
+  }
+}

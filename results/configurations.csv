@@ -1,0 +1,22 @@
+parameter,value
+python,3.12.10
+version_river,0.26.1
+version_numpy,2.2.6
+version_pandas,2.3.3
+random_seed,42
+target,target_hot
+tau_t_hot,20.2111833513539
+hot_percentile,0.8
+warmup_start,2013-01-01
+warmup_end,2015-12-31
+evaluation_start,2016-01-02 00:00:00
+evaluation_end,2023-12-31 23:00:00
+events_per_city,"{'Aveiro': 70104, 'Viseu': 70104}"
+rolling_window_size,720
+history_stride,24
+ensemble_size,10
+hoeffding_params,"{'grace_period': 50, 'delta': 0.001, 'tau': 0.1, 'leaf_prediction': 'mc'}"
+logistic_sgd_lr,0.05
+features_A,"['relative_humidity_lag1', 'precipitation_lag1', 'wind_speed_lag1']"
+features_B,"['relative_humidity_lag1', 'precipitation_lag1', 'wind_speed_lag1', 'rolling_mean_temp_6h', 'rolling_std_temp_6h', 'rolling_mean_temp_24h', 'heat_events_last_24h']"
+models,"['Majority class (baseline)', 'No-change (baseline)', 'Gaussian NB', 'Online Logistic Regression', 'Hoeffding Tree', 'Online Bagging', 'Adaptive Random Forest']"
