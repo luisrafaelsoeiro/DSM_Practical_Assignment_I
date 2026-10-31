@@ -3,20 +3,27 @@ python,3.12.10
 version_river,0.26.1
 version_numpy,2.2.6
 version_pandas,2.3.3
+version_scikit-learn,1.7.2
 random_seed,42
 target,target_hot
 tau_t_hot,20.2111833513539
 hot_percentile,0.8
 warmup_start,2013-01-01
 warmup_end,2015-12-31
-evaluation_start,2016-01-02 00:00:00
+tuning_data,first 25% of the evaluation stream
+tune_fraction_if_fallback,0.25
+tune_inner_warmup,0.3
+tune_scope,pooled
+tuning_metric,macro_f1
+tuning_min_gain,0.002
+tune_n_iter,"{'Online Logistic Regression': 15, 'Hoeffding Tree': 30, 'Online Bagging': 20, 'Adaptive Random Forest': 20}"
+search_spaces,"{'Gaussian NB': {}, 'Online Logistic Regression': {'lr': [0.001, 0.005, 0.01, 0.05, 0.1, 0.5], 'l2': [0.0, 0.0001, 0.001, 0.01]}, 'Hoeffding Tree': {'grace_period': [25, 50, 100, 200], 'delta': [1e-07, 1e-05, 0.001, 0.01], 'tau': [0.02, 0.05, 0.1, 0.2], 'leaf_prediction': ['mc', 'nb', 'nba']}, 'Online Bagging': {'n_models': [5, 10, 20], 'grace_period': [25, 50, 100], 'delta': [1e-05, 0.001], 'tau': [0.05, 0.1, 0.2]}, 'Adaptive Random Forest': {'n_models': [5, 10, 20], 'lambda_value': [3, 6, 10], 'max_features': ['sqrt', 'log2'], 'grace_period': [25, 50, 100], 'delta': [1e-05, 0.001], 'tau': [0.05, 0.1, 0.2]}}"
+default_params,"{'Gaussian NB': {}, 'Online Logistic Regression': {'lr': 0.05, 'l2': 0.0}, 'Hoeffding Tree': {'grace_period': 50, 'delta': 0.001, 'tau': 0.1, 'leaf_prediction': 'mc'}, 'Online Bagging': {'n_models': 10, 'grace_period': 50, 'delta': 0.001, 'tau': 0.1, 'leaf_prediction': 'mc'}, 'Adaptive Random Forest': {'n_models': 10, 'lambda_value': 6, 'max_features': 'sqrt', 'grace_period': 50, 'delta': 0.001, 'tau': 0.1, 'leaf_prediction': 'mc'}}"
+selected_params,"{'all|A': {'Gaussian NB': {}, 'Online Logistic Regression': {'lr': 0.5, 'l2': 0.0001}, 'Hoeffding Tree': {'grace_period': 200, 'delta': 0.001, 'tau': 0.2, 'leaf_prediction': 'nba'}, 'Online Bagging': {'n_models': 20, 'grace_period': 25, 'delta': 0.001, 'tau': 0.05, 'leaf_prediction': 'mc'}, 'Adaptive Random Forest': {'n_models': 20, 'lambda_value': 6, 'max_features': 'sqrt', 'grace_period': 25, 'delta': 1e-05, 'tau': 0.1, 'leaf_prediction': 'mc'}}, 'all|B': {'Gaussian NB': {}, 'Online Logistic Regression': {'lr': 0.5, 'l2': 0.0001}, 'Hoeffding Tree': {'grace_period': 100, 'delta': 0.01, 'tau': 0.05, 'leaf_prediction': 'nba'}, 'Online Bagging': {'n_models': 20, 'grace_period': 50, 'delta': 0.001, 'tau': 0.2, 'leaf_prediction': 'mc'}, 'Adaptive Random Forest': {'n_models': 20, 'lambda_value': 6, 'max_features': 'log2', 'grace_period': 25, 'delta': 0.001, 'tau': 0.1, 'leaf_prediction': 'mc'}}}"
+scored_events_per_city,"{'Aveiro': 52578, 'Viseu': 52578}"
+evaluation_start,2018-01-01 06:00:00
 evaluation_end,2023-12-31 23:00:00
-events_per_city,"{'Aveiro': 70104, 'Viseu': 70104}"
 rolling_window_size,720
 history_stride,24
-ensemble_size,10
-hoeffding_params,"{'grace_period': 50, 'delta': 0.001, 'tau': 0.1, 'leaf_prediction': 'mc'}"
-logistic_sgd_lr,0.05
 features_A,"['relative_humidity_lag1', 'precipitation_lag1', 'wind_speed_lag1']"
 features_B,"['relative_humidity_lag1', 'precipitation_lag1', 'wind_speed_lag1', 'rolling_mean_temp_6h', 'rolling_std_temp_6h', 'rolling_mean_temp_24h', 'heat_events_last_24h']"
-models,"['Majority class (baseline)', 'No-change (baseline)', 'Gaussian NB', 'Online Logistic Regression', 'Hoeffding Tree', 'Online Bagging', 'Adaptive Random Forest']"

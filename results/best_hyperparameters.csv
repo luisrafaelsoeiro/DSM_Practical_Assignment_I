@@ -1,0 +1,11 @@
+scope_group,representation,model,best_params
+all,A,Gaussian NB,{}
+all,A,Online Logistic Regression,"{""l2"": 0.0001, ""lr"": 0.5}"
+all,A,Hoeffding Tree,"{""delta"": 0.001, ""grace_period"": 200, ""leaf_prediction"": ""nba"", ""tau"": 0.2}"
+all,A,Online Bagging,"{""delta"": 0.001, ""grace_period"": 25, ""leaf_prediction"": ""mc"", ""n_models"": 20, ""tau"": 0.05}"
+all,A,Adaptive Random Forest,"{""delta"": 1e-05, ""grace_period"": 25, ""lambda_value"": 6, ""leaf_prediction"": ""mc"", ""max_features"": ""sqrt"", ""n_models"": 20, ""tau"": 0.1}"
+all,B,Gaussian NB,{}
+all,B,Online Logistic Regression,"{""l2"": 0.0001, ""lr"": 0.5}"
+all,B,Hoeffding Tree,"{""delta"": 0.01, ""grace_period"": 100, ""leaf_prediction"": ""nba"", ""tau"": 0.05}"
+all,B,Online Bagging,"{""delta"": 0.001, ""grace_period"": 50, ""leaf_prediction"": ""mc"", ""n_models"": 20, ""tau"": 0.2}"
+all,B,Adaptive Random Forest,"{""delta"": 0.001, ""grace_period"": 25, ""lambda_value"": 6, ""leaf_prediction"": ""mc"", ""max_features"": ""log2"", ""n_models"": 20, ""tau"": 0.1}"
