@@ -144,14 +144,14 @@ MONTH_TO_SEASON = {
 # 10. FEATURE ENGINEERING
 # ======================================================================
 FEATURE_COLS_A = [
-    #"temperature_lag1",
+    "temperature_lag1",
     "relative_humidity_lag1",
     "precipitation_lag1",
     "wind_speed_lag1",
 ]
 
 FEATURE_COLS_B = FEATURE_COLS_A + [
-    #"delta_temp",
+    "delta_temp",
     "rolling_mean_temp_6h",
     "rolling_std_temp_6h",
     "rolling_mean_temp_24h",

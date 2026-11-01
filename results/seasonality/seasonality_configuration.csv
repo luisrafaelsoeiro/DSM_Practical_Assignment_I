@@ -1,0 +1,11 @@
+parameter,value
+representation,B
+margin_days,14
+periods,"{'Early season': (4, 1), 'Core summer': (7, 1), 'Late season': (9, 1), 'Rest of year': (11, 16)}"
+specialists,"['Early season', 'Core summer', 'Late season']"
+min_seen_h,336
+threshold_bins,100
+threshold_min_events,50
+threshold_half_life_days,730
+threshold_range,"(0.05, 0.95)"
+base_learner_params,"{'Aveiro': {'lr': 0.05, 'l2': 0.0}, 'Viseu': {'lr': 0.05, 'l2': 0.0}}"
