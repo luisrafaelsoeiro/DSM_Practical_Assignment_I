@@ -5,13 +5,13 @@
 | | |
 |---|---|
 | **Assignment code** | PA08 |
-| **Group** | Group YY |
-| **Students** | _Student A name (number)_ – City A (Aveiro) · _Student B name (number)_ – City B (Viseu) |
+| **Group** | Group PA08 |
+| **Students** | Luís Soeiro (20211536) – City A (Aveiro) · Maria Inês Santos (20231630) – City B (Viseu) |
 | **City A / City B** | Aveiro / Viseu |
 | **Business scenario** | Chocolate Distribution Centre |
 | **Business question** | Which location may require more cooling effort during relatively hot periods? |
 | **Official target** | T2 – Heat Stress Event |
-| **Historical period** | 2013-01-01 → 2023-12-31 (hourly, Europe/Lisbon) |
+| **Historical period** | 2013-01-01 → 2023-12-31 (hourly) |
 | **Threshold warm-up** | 2013-01-01 → 2015-12-31 (common to both cities) |
 | **Python** | 3.12.10 |
 | **Random seed** | 42 |
