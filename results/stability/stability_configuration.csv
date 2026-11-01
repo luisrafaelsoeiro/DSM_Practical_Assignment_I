@@ -1,0 +1,12 @@
+parameter,value
+window_h,720
+stride_h,24
+min_event_share,0.05
+min_transitions,4
+seeds,"[42, 7, 123, 2024, 31415]"
+adwin_delta,0.002
+recovery_window_h,168
+recovery_max_days,90
+hot_season_months,"[5, 6, 7, 8, 9, 10]"
+window_grid_h,"[168, 720, 2160]"
+tuned,True
