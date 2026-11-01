@@ -99,8 +99,11 @@ python -m venv .venv
 # macOS / Linux
 source .venv/bin/activate
 
+pip install -r requirements-lock.txt
+
 pip install -r requirements.txt
-pip install river==0.26.1 joblib jupyter   # river version used for the reported results
+```
+`requirements-lock.txt` is the full `pip freeze` of the environment that produced the results in `results/` (Python 3.12.10, Windows). `requirements.txt` lists only the main packages.
 ```
 
 | Package | Version |
